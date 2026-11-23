@@ -22,12 +22,32 @@ spec:
       enableServiceLinks: false
       automountServiceAccountToken: false
       securityContext:
-        {{- with .Values.fsGroup }}
-        fsGroup: {{ . }}
-        {{- end }}
         seccompProfile:
           type: RuntimeDefault
       initContainers:
+        # LinuxServer's non-root mode needs /run, /config and /incomplete owned by the running user, and a new emptyDir or claim is root's.
+        - name: chown
+          image: {{ include "transmission.image" . | quote }}
+          command:
+            - chown
+            - "{{ .Values.puid }}:{{ .Values.pgid }}"
+            - /run
+            - /config
+            - /incomplete
+          securityContext:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [CHOWN]
+          volumeMounts:
+            - name: run
+              mountPath: /run
+            - name: config
+              mountPath: /config
+            - name: incomplete
+              mountPath: /incomplete
         # A native sidecar: Transmission starts only once the tunnel is up.
         - name: gluetun
           image: "ghcr.io/qdm12/gluetun:{{ .Values.gluetun.image.tag }}"

@@ -20,10 +20,10 @@ tests:
           mountPath: /media
     asserts:
       - equal:
-          path: spec.template.spec.initContainers[0].startupProbe.exec.command
+          path: spec.template.spec.initContainers[1].startupProbe.exec.command
           value: [/gluetun-entrypoint, healthcheck]
       - equal:
-          path: spec.template.spec.initContainers[0].readinessProbe.exec.command
+          path: spec.template.spec.initContainers[1].readinessProbe.exec.command
           value: [/gluetun-entrypoint, healthcheck]
       - notExists:
-          path: spec.template.spec.initContainers[0].livenessProbe
+          path: spec.template.spec.initContainers[1].livenessProbe

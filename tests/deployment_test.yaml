@@ -24,7 +24,7 @@ tests:
           path: spec.template.spec.containers[1].image
           value: lscr.io/linuxserver/transmission:4.1.4-r0-ls370
       - equal:
-          path: spec.template.spec.initContainers[0].image
+          path: spec.template.spec.initContainers[1].image
           value: ghcr.io/qdm12/gluetun:v3.41.3
 
   - it: uses the image tags when they are set
@@ -36,10 +36,10 @@ tests:
           path: spec.template.spec.containers[0].image
           value: lscr.io/linuxserver/transmission:4.1.3-r0-ls1
       - equal:
-          path: spec.template.spec.initContainers[1].image
+          path: spec.template.spec.initContainers[2].image
           value: lscr.io/linuxserver/transmission:4.1.3-r0-ls1
       - equal:
-          path: spec.template.spec.initContainers[0].image
+          path: spec.template.spec.initContainers[1].image
           value: ghcr.io/qdm12/gluetun:v3.41.2
 
   - it: leaves the chart's version off the pod, so a chart-only release doesn't restart it
@@ -56,13 +56,13 @@ tests:
   - it: runs Gluetun first, as a native sidecar with root and NET_ADMIN
     asserts:
       - equal:
-          path: spec.template.spec.initContainers[0].name
+          path: spec.template.spec.initContainers[1].name
           value: gluetun
       - equal:
-          path: spec.template.spec.initContainers[0].restartPolicy
+          path: spec.template.spec.initContainers[1].restartPolicy
           value: Always
       - equal:
-          path: spec.template.spec.initContainers[0].securityContext
+          path: spec.template.spec.initContainers[1].securityContext
           value:
             runAsUser: 0
             capabilities:
@@ -71,18 +71,18 @@ tests:
   - it: clears stale IP rules when Gluetun starts
     asserts:
       - equal:
-          path: spec.template.spec.initContainers[0].lifecycle.postStart.exec.command[2]
+          path: spec.template.spec.initContainers[1].lifecycle.postStart.exec.command[2]
           value: (ip rule del table 51820; ip -6 rule del table 51820) || true
 
   - it: passes the provider settings, the key from its Secret and the firewall settings to Gluetun
     asserts:
       - contains:
-          path: spec.template.spec.initContainers[0].env
+          path: spec.template.spec.initContainers[1].env
           content:
             name: VPN_SERVICE_PROVIDER
             value: custom
       - contains:
-          path: spec.template.spec.initContainers[0].env
+          path: spec.template.spec.initContainers[1].env
           content:
             name: WIREGUARD_PRIVATE_KEY
             valueFrom:
@@ -90,12 +90,12 @@ tests:
                 name: gluetun
                 key: wireguard-private-key
       - contains:
-          path: spec.template.spec.initContainers[0].env
+          path: spec.template.spec.initContainers[1].env
           content:
             name: FIREWALL_INPUT_PORTS
             value: "9091"
       - contains:
-          path: spec.template.spec.initContainers[0].env
+          path: spec.template.spec.initContainers[1].env
           content:
             name: FIREWALL_OUTBOUND_SUBNETS
             value: 10.0.0.0/8
@@ -105,28 +105,28 @@ tests:
       downloadQueueSize: 3
     asserts:
       - equal:
-          path: spec.template.spec.initContainers[1].name
+          path: spec.template.spec.initContainers[2].name
           value: settings
       - contains:
-          path: spec.template.spec.initContainers[1].env
+          path: spec.template.spec.initContainers[2].env
           content:
             name: DOWNLOAD_DIR
             value: /media/downloads
       - contains:
-          path: spec.template.spec.initContainers[1].env
+          path: spec.template.spec.initContainers[2].env
           content:
             name: INCOMPLETE_DIR
             value: /incomplete
       - contains:
-          path: spec.template.spec.initContainers[1].env
+          path: spec.template.spec.initContainers[2].env
           content:
             name: QUEUE_SIZE
             value: "3"
       - matchRegex:
-          path: spec.template.spec.initContainers[1].command[2]
+          path: spec.template.spec.initContainers[2].command[2]
           pattern: incomplete-dir-enabled
       - equal:
-          path: spec.template.spec.initContainers[1].volumeMounts
+          path: spec.template.spec.initContainers[2].volumeMounts
           value:
             - name: config
               mountPath: /config
@@ -182,7 +182,7 @@ tests:
             capabilities:
               drop: [ALL]
       - equal:
-          path: spec.template.spec.initContainers[1].securityContext.runAsUser
+          path: spec.template.spec.initContainers[2].securityContext.runAsUser
           value: 1026
 
   - it: probes Transmission's port, because an HTTP probe gets 401 or 409
@@ -200,7 +200,7 @@ tests:
   - it: shares the forwarded port file with the port-sync sidecar, read-only
     asserts:
       - equal:
-          path: spec.template.spec.initContainers[0].volumeMounts
+          path: spec.template.spec.initContainers[1].volumeMounts
           value:
             - name: gluetun
               mountPath: /tmp/gluetun
@@ -273,7 +273,7 @@ tests:
             requests:
               cpu: 100m
       - equal:
-          path: spec.template.spec.initContainers[0].resources
+          path: spec.template.spec.initContainers[1].resources
           value:
             requests:
               memory: 64Mi
@@ -341,15 +341,29 @@ tests:
       - failedTemplate:
           errorMessage: persistence.config.existingClaim is required
 
-  - it: sets the pod's fsGroup only when asked
-    asserts:
-      - notExists:
-          path: spec.template.spec.securityContext.fsGroup
-
-  - it: takes the fsGroup from values
-    set:
-      fsGroup: 100
+  - it: sets the owner of /run and the chart's own volumes with only the CHOWN capability
     asserts:
       - equal:
-          path: spec.template.spec.securityContext.fsGroup
-          value: 100
+          path: spec.template.spec.initContainers[0].name
+          value: chown
+      - equal:
+          path: spec.template.spec.initContainers[0].command
+          value: [chown, "1000:1000", /run, /config, /incomplete]
+      - equal:
+          path: spec.template.spec.initContainers[0].securityContext
+          value:
+            runAsUser: 0
+            runAsNonRoot: false
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+              add: [CHOWN]
+
+  - it: sets the owner to the configured user and group
+    set:
+      puid: 1026
+      pgid: 100
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].command[1]
+          value: "1026:100"
