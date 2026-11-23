@@ -22,6 +22,9 @@ spec:
       enableServiceLinks: false
       automountServiceAccountToken: false
       securityContext:
+        {{- with .Values.fsGroup }}
+        fsGroup: {{ . }}
+        {{- end }}
         seccompProfile:
           type: RuntimeDefault
       initContainers:

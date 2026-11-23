@@ -17,6 +17,7 @@ Transmission keeps its settings and resume files on a `/config` volume, partial 
 | `image.tag` | the chart's `appVersion` (Transmission and the port-sync sidecar) |
 | `puid` | `1000` |
 | `pgid` | `1000` |
+| `fsGroup` | none |
 | `timezone` | `UTC` |
 | `gluetun.image.tag` | `v3.41.3` |
 | `gluetun.env` | none; required, a map of Gluetun's provider settings |
@@ -66,6 +67,7 @@ The pod's containers are set up as follows:
 - The port-sync sidecar reads the port Gluetun forwards, if the provider settings turn port forwarding on, and sets it as Transmission's peer port with `transmission-remote` whenever it changes.
 - Transmission and the sidecar run in LinuxServer's non-root mode, as `puid` and `pgid`, with all capabilities dropped.
   The image no longer fixes volume ownership in this mode, so every claim must be writable by that user.
+  Where the storage can't be made writable that way, set `fsGroup`.
 
 ## Requirements
 

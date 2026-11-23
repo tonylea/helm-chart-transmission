@@ -3,6 +3,7 @@ image:
 
 puid: 1000
 pgid: 1000
+fsGroup: null
 
 timezone: UTC
 

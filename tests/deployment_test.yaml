@@ -340,3 +340,16 @@ tests:
     asserts:
       - failedTemplate:
           errorMessage: persistence.config.existingClaim is required
+
+  - it: sets the pod's fsGroup only when asked
+    asserts:
+      - notExists:
+          path: spec.template.spec.securityContext.fsGroup
+
+  - it: takes the fsGroup from values
+    set:
+      fsGroup: 100
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext.fsGroup
+          value: 100
