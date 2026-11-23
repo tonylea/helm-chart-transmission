@@ -292,7 +292,7 @@ tests:
 
   - it: fails without a VPN provider
     set:
-      gluetun.env: {}
+      gluetun.env: null
     asserts:
       - failedTemplate:
           errorMessage: "gluetun.env is required: it holds the VPN provider's settings"
