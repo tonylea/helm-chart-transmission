@@ -359,6 +359,14 @@ tests:
               drop: [ALL]
               add: [CHOWN]
 
+  - it: leaves /incomplete out of the chown when told to
+    set:
+      persistence.incomplete.chown: false
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].command
+          value: [chown, "1000:1000", /run, /config]
+
   - it: sets the owner to the configured user and group
     set:
       puid: 1026

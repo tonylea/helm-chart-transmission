@@ -33,7 +33,9 @@ spec:
             - "{{ .Values.puid }}:{{ .Values.pgid }}"
             - /run
             - /config
+            {{- if .Values.persistence.incomplete.chown }}
             - /incomplete
+            {{- end }}
           securityContext:
             runAsUser: 0
             runAsNonRoot: false

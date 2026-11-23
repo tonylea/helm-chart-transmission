@@ -36,6 +36,7 @@ Transmission keeps its settings and resume files on a `/config` volume, partial 
 | `portSync.resources` | none |
 | `persistence.config.existingClaim` | none; required |
 | `persistence.incomplete.existingClaim` | none; required |
+| `persistence.incomplete.chown` | `true`; set `false` where the storage refuses a chown, such as an NFS export that maps every user to one |
 | `persistence.media` | none; at least one mount required |
 | `persistence.media[].name` | required |
 | `persistence.media[].existingClaim` | required |
