@@ -1,0 +1,37 @@
+suite: HTTPRoute
+release:
+  name: transmission
+templates:
+  - templates/httproute.yaml
+tests:
+  - it: is off by default
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: routes the hostnames to Transmission's Service
+    set:
+      httpRoute.enabled: true
+      httpRoute.parentRefs:
+        - name: gateway
+          namespace: gateway-system
+      httpRoute.hostnames: [transmission.example.com]
+    asserts:
+      - equal:
+          path: spec
+          value:
+            parentRefs:
+              - name: gateway
+                namespace: gateway-system
+            hostnames: [transmission.example.com]
+            rules:
+              - backendRefs:
+                  - name: transmission
+                    port: 9091
+
+  - it: fails without a parent
+    set:
+      httpRoute.enabled: true
+    asserts:
+      - failedTemplate:
+          errorMessage: httpRoute.parentRefs is required when httpRoute is enabled

@@ -1,0 +1,11 @@
+apiVersion: v2
+name: transmission
+description: Deploys Transmission behind Gluetun, which downloads torrents through a VPN
+type: application
+version: 1.0.0
+appVersion: "4.1.4-r0-ls370"
+home: https://github.com/tonylea/helm-chart-transmission
+sources:
+  - https://github.com/transmission/transmission
+  - https://github.com/linuxserver/docker-transmission
+  - https://github.com/qdm12/gluetun
