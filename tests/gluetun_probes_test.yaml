@@ -1,0 +1,29 @@
+suite: Gluetun probes
+release:
+  name: transmission
+templates:
+  - templates/deployment.yaml
+tests:
+  - it: probes Gluetun with its own health check, and has no liveness probe
+    set:
+      gluetun.env.VPN_SERVICE_PROVIDER: custom
+      gluetun.firewallOutboundSubnets: 10.0.0.0/8
+      gluetun.wireguardPrivateKey.secretKeyRef.name: gluetun
+      auth.username.secretKeyRef.name: transmission
+      auth.password.secretKeyRef.name: transmission
+      downloadDir: /media/downloads
+      persistence.config.existingClaim: config
+      persistence.incomplete.existingClaim: incomplete
+      persistence.media:
+        - name: media
+          existingClaim: media
+          mountPath: /media
+    asserts:
+      - equal:
+          path: spec.template.spec.initContainers[0].startupProbe.exec.command
+          value: [/gluetun-entrypoint, healthcheck]
+      - equal:
+          path: spec.template.spec.initContainers[0].readinessProbe.exec.command
+          value: [/gluetun-entrypoint, healthcheck]
+      - notExists:
+          path: spec.template.spec.initContainers[0].livenessProbe

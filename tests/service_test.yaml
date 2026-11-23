@@ -1,0 +1,19 @@
+suite: Service
+release:
+  name: transmission
+templates:
+  - templates/service.yaml
+tests:
+  - it: exposes the web UI and RPC on 9091 and no peer port
+    asserts:
+      - equal:
+          path: spec.ports
+          value:
+            - name: http
+              port: 9091
+              targetPort: http
+      - equal:
+          path: spec.selector
+          value:
+            app.kubernetes.io/name: transmission
+            app.kubernetes.io/instance: transmission

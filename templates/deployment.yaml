@@ -1,0 +1,180 @@
+{{- $_ := include "transmission.validate" . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "transmission.labels" . | nindent 4 }}
+spec:
+  # Transmission's resume files can't be shared, so the old pod stops before the new one starts.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "transmission.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "transmission.podLabels" . | nindent 8 }}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # A native sidecar: Transmission starts only once the tunnel is up.
+        - name: gluetun
+          image: "ghcr.io/qdm12/gluetun:{{ .Values.gluetun.image.tag }}"
+          restartPolicy: Always
+          env:
+            - name: TZ
+              value: {{ .Values.timezone | quote }}
+            {{- range $name, $value := .Values.gluetun.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: WIREGUARD_PRIVATE_KEY
+              valueFrom:
+                {{- include "transmission.secretKeyRef" (list "gluetun.wireguardPrivateKey" .Values.gluetun.wireguardPrivateKey) | nindent 16 }}
+            - name: FIREWALL_INPUT_PORTS
+              value: "9091"
+            - name: FIREWALL_OUTBOUND_SUBNETS
+              value: {{ .Values.gluetun.firewallOutboundSubnets | quote }}
+          securityContext:
+            runAsUser: 0
+            capabilities:
+              add: [NET_ADMIN]
+          # The IP rules belong to the pod and outlive the container, so a restart after an abrupt exit finds them.
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - (ip rule del table 51820; ip -6 rule del table 51820) || true
+          startupProbe:
+            {{- toYaml .Values.gluetun.startupProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.gluetun.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.gluetun.resources | nindent 12 }}
+          volumeMounts:
+            - name: gluetun
+              mountPath: /tmp/gluetun
+        # Transmission rewrites settings.json on exit, so it can only be set before it starts.
+        - name: settings
+          image: {{ include "transmission.image" . | quote }}
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              [ -f /config/settings.json ] || cp /defaults/settings.json /config/settings.json
+              jq --arg download "$DOWNLOAD_DIR" --arg incomplete "$INCOMPLETE_DIR" --argjson queue "$QUEUE_SIZE" \
+                '.["download-dir"] = $download | .["incomplete-dir"] = $incomplete | .["incomplete-dir-enabled"] = true | .["download-queue-size"] = $queue' \
+                /config/settings.json > /config/settings.json.new
+              mv /config/settings.json.new /config/settings.json
+          env:
+            - name: DOWNLOAD_DIR
+              value: {{ .Values.downloadDir | quote }}
+            - name: INCOMPLETE_DIR
+              value: /incomplete
+            - name: QUEUE_SIZE
+              value: {{ .Values.downloadQueueSize | quote }}
+          securityContext:
+            {{- include "transmission.securityContext" . | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+      containers:
+        - name: transmission
+          image: {{ include "transmission.image" . | quote }}
+          env:
+            - name: TZ
+              value: {{ .Values.timezone | quote }}
+            - name: USER
+              valueFrom:
+                {{- include "transmission.secretKeyRef" (list "auth.username" .Values.auth.username) | nindent 16 }}
+            - name: PASS
+              valueFrom:
+                {{- include "transmission.secretKeyRef" (list "auth.password" .Values.auth.password) | nindent 16 }}
+          ports:
+            - name: http
+              containerPort: 9091
+          securityContext:
+            {{- include "transmission.securityContext" . | nindent 12 }}
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            failureThreshold: 60
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+            - name: incomplete
+              mountPath: /incomplete
+            {{- range .Values.persistence.media }}
+            - name: media-{{ .name }}
+              mountPath: {{ .mountPath }}
+            {{- end }}
+            - name: run
+              mountPath: /run
+        # Sets the peer port Gluetun forwards, which changes whenever the VPN reconnects.
+        - name: port-sync
+          image: {{ include "transmission.image" . | quote }}
+          command:
+            - sh
+            - -c
+            - |
+              last=
+              while true; do
+                port=$(cat /tmp/gluetun/forwarded_port 2>/dev/null || true)
+                if [ -n "$port" ] && [ "$port" != "$last" ] \
+                  && transmission-remote localhost:9091 --auth "$USER:$PASS" --port "$port"; then
+                  last=$port
+                fi
+                sleep 10
+              done
+          env:
+            - name: USER
+              valueFrom:
+                {{- include "transmission.secretKeyRef" (list "auth.username" .Values.auth.username) | nindent 16 }}
+            - name: PASS
+              valueFrom:
+                {{- include "transmission.secretKeyRef" (list "auth.password" .Values.auth.password) | nindent 16 }}
+          securityContext:
+            {{- include "transmission.securityContext" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.portSync.resources | nindent 12 }}
+          volumeMounts:
+            - name: gluetun
+              mountPath: /tmp/gluetun
+              readOnly: true
+      volumes:
+        - name: config
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.config.existingClaim }}
+        - name: incomplete
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.incomplete.existingClaim }}
+        {{- range .Values.persistence.media }}
+        - name: media-{{ .name }}
+          persistentVolumeClaim:
+            claimName: {{ .existingClaim }}
+        {{- end }}
+        - name: gluetun
+          emptyDir: {}
+        - name: run
+          emptyDir: {}

@@ -1,0 +1,36 @@
+gluetun:
+  env:
+    VPN_SERVICE_PROVIDER: custom
+    VPN_TYPE: wireguard
+    WIREGUARD_ENDPOINT_IP: 192.0.2.1
+    WIREGUARD_ENDPOINT_PORT: "51820"
+    WIREGUARD_PUBLIC_KEY: 7Kj0PT3hTbQ3WiRWuZ4hmpnE9TL0lRbq0DGWoY4yQ1E=
+    WIREGUARD_ADDRESSES: 10.64.0.2/32
+  wireguardPrivateKey:
+    secretKeyRef:
+      name: gluetun
+  firewallOutboundSubnets: 10.0.0.0/8
+  # No VPN server answers in kind, so the tunnel never comes up.
+  startupProbe:
+    exec:
+      command: [/bin/true]
+  readinessProbe:
+    exec:
+      command: [/bin/true]
+auth:
+  username:
+    secretKeyRef:
+      name: transmission
+  password:
+    secretKeyRef:
+      name: transmission
+downloadDir: /media/downloads
+persistence:
+  config:
+    existingClaim: config
+  incomplete:
+    existingClaim: incomplete
+  media:
+    - name: media
+      existingClaim: media
+      mountPath: /media

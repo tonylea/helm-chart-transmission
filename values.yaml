@@ -1,0 +1,58 @@
+image:
+  tag: ""
+
+puid: 1000
+pgid: 1000
+
+timezone: UTC
+
+gluetun:
+  image:
+    tag: v3.41.3
+  env: {}
+  wireguardPrivateKey:
+    secretKeyRef:
+      name: ""
+      key: wireguard-private-key
+  firewallOutboundSubnets: ""
+  startupProbe:
+    exec:
+      command: [/gluetun-entrypoint, healthcheck]
+    periodSeconds: 5
+    failureThreshold: 60
+  readinessProbe:
+    exec:
+      command: [/gluetun-entrypoint, healthcheck]
+    periodSeconds: 10
+    timeoutSeconds: 5
+  resources: {}
+
+auth:
+  username:
+    secretKeyRef:
+      name: ""
+      key: username
+  password:
+    secretKeyRef:
+      name: ""
+      key: password
+
+downloadDir: ""
+downloadQueueSize: 2
+
+resources: {}
+
+portSync:
+  resources: {}
+
+persistence:
+  config:
+    existingClaim: ""
+  incomplete:
+    existingClaim: ""
+  media: []
+
+httpRoute:
+  enabled: false
+  parentRefs: []
+  hostnames: []

@@ -12,6 +12,18 @@
     "package-lock.json"
   ],
   "words": [
-    "kubeconform"
+    "argjson",
+    "gluetun",
+    "healthcheck",
+    "httproute",
+    "kubeconform",
+    "lscr",
+    "nindent",
+    "pgid",
+    "protonvpn",
+    "puid",
+    "timezone",
+    "userspace",
+    "writable"
   ]
 }
