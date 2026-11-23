@@ -50,6 +50,8 @@ persistence:
     existingClaim: ""
   incomplete:
     existingClaim: ""
+    # Off for storage that won't take a chown, such as an NFS export that maps every user.
+    chown: true
   media: []
 
 httpRoute:
